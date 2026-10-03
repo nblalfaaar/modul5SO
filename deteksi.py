@@ -1,47 +1,69 @@
+def buat_wait_for(memegang, menunggu):
+    """
+    memegang : {resource: pemilik}   -> siapa memegang resource apa
+    menunggu : {proses: resource}    -> proses sedang menunggu resource apa
+    Hasil    : {proses: [proses yang ditunggu]}  (Wait-For Graph)
+    """
+    semua_proses = sorted(set(memegang.values()) | set(menunggu))
+    graph = {p: [] for p in semua_proses}
+    for proses, resource in menunggu.items():
+        pemilik = memegang.get(resource)
+        if pemilik is not None and pemilik != proses:
+            graph[proses].append(pemilik)
+    return graph
+
+
 def cek_siklus(graph):
+    """Cari siklus di graph dengan DFS. Hasil: list siklus, atau None."""
     pernah_dikunjungi = set()
-    sedang_dalam_stack = set()
+    jalur = []  
 
-    def dfs(node, jalur):
+    def dfs(node):
         pernah_dikunjungi.add(node)
-        sedang_dalam_stack.add(node)
+        jalur.append(node)
 
-        for next_node in graph.get(node, []):
-            if next_node in sedang_dalam_stack:
-                # potong jalur mulai dari awal siklus
-                return jalur[jalur.index(next_node):] + [next_node]
-            if next_node not in pernah_dikunjungi:
-                hasil = dfs(next_node, jalur + [next_node])
+        for tetangga in graph.get(node, []):
+            if tetangga in jalur:  
+                awal = jalur.index(tetangga)
+                return jalur[awal:] + [tetangga]
+            if tetangga not in pernah_dikunjungi:
+                hasil = dfs(tetangga)
                 if hasil:
                     return hasil
 
-        sedang_dalam_stack.remove(node)
+        jalur.pop()
         return None
 
     for node in graph:
         if node not in pernah_dikunjungi:
-            siklus = dfs(node, [node])
-            if siklus:
-                return True, siklus
+            hasil = dfs(node)
+            if hasil:
+                return hasil
+    return None
 
-    return False, []
 
-def tampilkan(nama, graph):
-    macet, siklus = cek_siklus(graph)
-    print(f"[{nama}]")
-    if macet:
-        print("  DEADLOCK DETECTED! Siklus:", " -> ".join(siklus))
+def tampilkan(judul, graph):
+    print(f"\n=== {judul} ===")
+    for proses, tujuan in graph.items():
+        print(f"  {proses} menunggu: {', '.join(tujuan) if tujuan else '-'}")
+
+
+def periksa(judul, memegang, menunggu):
+    graph = buat_wait_for(memegang, menunggu)
+    tampilkan(judul, graph)
+    siklus = cek_siklus(graph)
+    if siklus:
+        print("  DEADLOCK DETECTED! Siklus: " + " -> ".join(siklus))
     else:
-        print("  Amannnn, ga ada deadlock yeyy")
+        print("  Tidak ada deadlock")
+    return siklus
 
-kasus_macet = {
-    "Orang 1": ["Orang 2"],
-    "Orang 2": ["Orang 1"],
-}
-kasus_aman = {
-    "Orang 1": ["Orang 2"],
-    "Orang 2": [],
-}
+# Kasus 1 : kondisi program deadlock.py setelah 1 detik
+memegang_macet = {"kunci1": "Orang 1", "kunci2": "Orang 2"}
+menunggu_macet = {"Orang 1": "kunci2", "Orang 2": "kunci1"}
+periksa("Kasus 1 (macet)", memegang_macet, menunggu_macet)
 
-tampilkan("Kasus 1: saling menunggu", kasus_macet)
-tampilkan("Kasus 2: menunggu tanpa siklus", kasus_aman)
+# Kasus 2 : Orang 2 sudah memegang kunci2 tetapi tidak menunggu apa pun
+memegang_aman = {"kunci1": "Orang 1", "kunci2": "Orang 2"}
+menunggu_aman = {"Orang 1": "kunci2"}
+periksa("Kasus 2 (aman)", memegang_aman, menunggu_aman)
